@@ -119,3 +119,45 @@ Kelas   : B
 5. Commit 5 - Multithreaded server using Threadpool
 
     Untuk mengimplementasikan *multithreading*, kita akan menggunakan *Threadpool*, yaitu sekumpulan *thread* yang akan bekerja ketika sebuah tugas atau *request* masuk. Pada *Threadpool* akan ada sekumpulan *Worker*. Setiap *request* yang masuk akan dikirimkan ke *worker* melalui sebuah *channel*. *Worker* bertugas untuk menerima sebuah *job* lalu mengerjakan *job* tersebut. Ketika ada sebuah *request* yang masuk, sebuah *worker* akan mengerjakan *request* tersebut, sementara *worker* lain dapat *stand-by* menunggu *request* lain yang masuk. Jadi, ketika sebuah *worker* sedang mengerjakan *request* dan ada *request* baru yang masuk, *worker* lain dapat mengerjakan *request* yang baru masuk tersebut. 
+
+6. Bonus - Function Improvement
+    
+    Sesuai yang ada di [dokumentasi Rust](https://rust-book.cs.brown.edu/ch20-02-multithreaded.html), saya akan mencoba mengganti implementasi `new` menjadi `build` atau `pub fn build(size: usize) -> Result<ThreadPool, PoolCreationError> {`
+
+    Untuk mengimplementasikannya, saya menambahkan PoolCreationError ke dalam kode:
+    ```
+    pub struct PoolCreationError;
+
+    impl fmt::Debug for PoolCreationError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "Invalid Threadpool size")
+        }
+    }
+    ```
+
+    Dari yang saya baca [(Debug)](https://doc.rust-lang.org/std/fmt/trait.Debug.html), untuk mengimplementasikan `build` dengan `PoolCreationError`, kita perlu mengimplementasikan `Debug` *traits* ke dalam `PoolCreationError`. Untuk melakukan hal tersebut, kita perlu menggunakan library `fmt`.
+
+    ```
+    pub fn build(size: usize) -> Result<ThreadPool, PoolCreationError> {
+        if size <= 0 {
+            return Err(PoolCreationError);
+        }
+
+        let (sender, receiver) = mpsc::channel();
+        let receiver = Arc::new(Mutex::new(receiver));
+
+        let mut workers = Vec::with_capacity(size);
+        for id in 0..size {
+            workers.push(Worker::new(id, Arc::clone(&receiver)));
+        }
+
+        Ok(ThreadPool { workers, sender })
+    }
+    ```
+
+    Sekarang *function* `build` akan melakukan hal yang sama dengan `new`. Bedanya, ketika kita menginput ukurang yang tidak valid fungsi `build` akan memanggil *error* `PoolCreationError`.
+
+    Tidak lupa setelah mengubah fungsi tersebut, saya juga mengganti pemanggilannya pada `main.rs`:
+    ```
+    let pool = ThreadPool::build(4).unwrap();
+    ```
